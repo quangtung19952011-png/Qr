@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quét Đơn Hàng Kho - MISA</title>
+    <!-- Thư viện quét mã QR -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #scanner-container {
+            width: 100%;
+            height: 38vh;
+            background-color: #000;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        #reader {
+            width: 100% !important;
+            height: 100% !important;
+            border: none !important;
+        }
+        #reader video {
+            object-fit: cover !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .main-content {
+            flex: 1;
+            background: #ffffff;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            margin-top: -12px;
+            padding: 16px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #eef2f5;
+            margin-bottom: 12px;
+        }
+        .tab-item {
+            flex: 1;
+            padding: 10px 0;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: #637381;
+        }
+        .tab-item.active {
+            color: #0052cc;
+            border-bottom: 3px solid #0052cc;
+        }
+        .order-card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: none;
+        }
+        .order-header {
+            font-size: 15px;
+            font-weight: bold;
+            color: #0052cc;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 6px;
+        }
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+        .order-row span:first-child {
+            color: #637381;
+        }
+        .order-row span:last-child {
+            font-weight: bold;
+            color: #333;
+        }
+        .product-item {
+            display: flex;
+            align-items: flex-start;
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #eee;
+        }
+        .product-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #ddd;
+            margin-right: 12px;
+            flex-shrink: 0;
+            cursor: pointer;
+            border: 1px solid #ccc;
+        }
+        .product-info {
+            font-size: 13px;
+            color: #333;
+            flex: 1;
+        }
+        .product-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: #111;
+            margin-bottom: 4px;
+        }
+        .product-desc {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+        .product-qty {
+            font-weight: 800;
+            color: #0052cc;
+            font-size: 18px; 
+            margin-top: 4px;
+        }
+        .status-badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .placeholder-text {
+            text-align: center;
+            color: #637381;
+            font-size: 14px;
+            padding: 20px;
+        }
+        #imgModal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+        }
+        #imgModal img {
+            max-width: 90%;
+            max-height: 80%;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Khung hiển thị camera -->
+    <div id="scanner-container">
+        <div id="reader"></div>
+    </div>
+
+    <!-- Giao diện kho -->
+    <div class="main-content">
+        <div class="tabs">
+            <div class="tab-item">ĐÓNG GÓI</div>
+            <div class="tab-item active">XEM ĐƠN</div>
+            <div class="tab-item">HOÀN HÀNG</div>
+        </div>
+
+        <div id="placeholder" class="placeholder-text">
+            📷 Đưa mã QR đơn hàng vào khung hình để quét tự động...
+        </div>
+
+        <!-- Thẻ hiển thị chi tiết đơn hàng -->
+        <div class="order-card" id="orderCard">
+            <div class="order-header" id="c-code">Mã đơn hàng: --</div>
+            <div class="order-row">
+                <span>Khách hàng:</span>
+                <span id="c-customer">Đang tải...</span>
+            </div>
+            <div class="order-row">
+                <span>Số điện thoại:</span>
+                <span id="c-phone">0912345678</span>
+            </div>
+            <div class="order-row">
+                <span>Trạng thái:</span>
+                <span class="status-badge">Đã xác nhận / Chờ đóng gói</span>
+            </div>
+
+            <div style="font-size: 13px; font-weight: bold; margin-top: 10px; color: #555;">Danh sách sản phẩm:</div>
+            
+            <div class="product-item">
+                <img src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300" class="product-img" onclick="openModal(this.src)" alt="Product">
+                <div class="product-info">
+                    <div class="product-name" id="p-name">Móc khoá in theo yêu cầu</div>
+                    <div class="product-desc" id="p-desc">Móc khoá cắt viền in theo ảnh yêu cầu chuẩn kho.</div>
+                    <div class="product-qty">× 1</div>
+                </div>
+            </div>
+
+            <div class="order-row" style="margin-top: 12px;">
+                <span>Tổng tiền đơn hàng:</span>
+                <span style="color: #d32f2f; font-size: 15px;" id="c-total">385.000 đ</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal phóng to ảnh sản phẩm -->
+    <div id="imgModal" onclick="closeModal()">
+        <img id="modalImg" src="">
+    </div>
+
+    <script>
+        let html5QrCode = null;
+        let lastScannedCode = "";
+        let scanCooldown = false;
+
+        async function startCamera() {
+            try {
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("reader");
+                }
+
+                const qrCodeSuccessCallback = (decodedText) => {
+                    if (scanCooldown) return;
+                    if (decodedText === lastScannedCode) return;
+
+                    lastScannedCode = decodedText;
+                    scanCooldown = true;
+
+                    // Cập nhật thông tin đơn hàng tự động
+                    document.getElementById('c-code').innerText = "Mã đơn hàng: " + decodedText;
+                    document.getElementById('c-customer').innerText = "Khách hàng đơn #" + decodedText.slice(-4);
+                    
+                    document.getElementById('placeholder').style.display = 'none';
+                    document.getElementById('orderCard').style.display = 'block';
+
+                    setTimeout(() => {
+                        scanCooldown = false;
+                    }, 2000);
+                };
+
+                const config = { 
+                    fps: 10, 
+                    qrbox: { width: 170, height: 170 } 
+                };
+
+                // Cố gắng bật camera sau trực tiếp, nếu lỗi sẽ tự động fallback sang danh sách thiết bị
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    qrCodeSuccessCallback
+                );
+            } catch (err) {
+                console.warn("Lỗi khởi động camera chính, đang thử quét danh sách thiết bị...", err);
+                try {
+                    const devices = await Html5Qrcode.getCameras();
+                    if (devices && devices.length > 0) {
+                        // Chọn camera sau (thường là camera cuối cùng trong danh sách điện
